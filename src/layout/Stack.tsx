@@ -1,13 +1,8 @@
-import type { LayoutElement } from "./Types.js";
+import { Direction } from "../types/Direction.js";
+import type { ParentElement } from "../types/Element.js";
+import { getDefaultProperties, type DefaultProperties } from "../types/Properties.js";
 
-export enum Direction {
-    Horizontal = "horizontal",
-    Vertical = "vertical",
-}
-
-export interface StackProps {
-    /** Extra class value. */
-    class?: string;
+export interface StackProperties extends DefaultProperties {
     /**
      * The direction the elements should be laid out.
      *
@@ -21,25 +16,28 @@ export interface StackProps {
  *
  * ### classes
  * * `ui-stack`
- * * `direction-horizontal` | `direction-vertical`
+ * * `direction-row` | `direction-column` | `direction-row-reverse` | `direction-column-reverse`
  *
  * ### element style:
  * ```css
  * Stack {
  *   display: flex;
- *   flex-direction: row | column;
+ *   flex-direction: row | column | row-reverse | column-reverse;
  * }
  * ```
  *
  * @param props.direction The direction the stack should order the elements.
  */
-export const Stack: LayoutElement<StackProps> = (props) => {
+export const Stack: ParentElement<StackProperties> = (props) => {
     return (
         <div
-            className={`ui-stack direction-${props.direction ?? Direction.Vertical} ${props.class}`.trim()}
+            {...getDefaultProperties(
+                props,
+                `ui-stack direction-${props.direction ?? Direction.Column}`,
+            )}
             style={{
                 display: "flex",
-                flexDirection: props.direction === Direction.Horizontal ? "row" : "column",
+                flexDirection: props.direction ?? Direction.Column,
             }}
         >
             { props.children }
