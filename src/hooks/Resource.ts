@@ -7,11 +7,12 @@ export type ResourceValue<T> = {
     latest?: T;
     error?: unknown;
 }
-export type ResourceControls = {
+export type ResourceControls<T> = {
     refetch: () => void;
+    mutate: (value: T) => void;
 }
 
-export function useResource<T>(callback: ResourceCallback<T>): [ResourceValue<T>, ResourceControls] {
+export function useResource<T>(callback: ResourceCallback<T>): [ResourceValue<T>, ResourceControls<T>] {
     const [value, setValue] = useSignal<ResourceValue<T>>({
         state: ProcessFlags.LOADING,
     });
@@ -39,6 +40,12 @@ export function useResource<T>(callback: ResourceCallback<T>): [ResourceValue<T>
         refetch: () => {
             setValue((prev) => ({ ...prev, state: prev.state | ProcessFlags.LOADING }));
             void loadResource(true);
+        },
+        mutate: (value) => {
+            setValue({
+                state: ProcessFlags.READY,
+                latest: value,
+            });
         },
     }];
 }

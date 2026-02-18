@@ -1,4 +1,5 @@
 import type { ParentElement } from "../types/Element.js";
+import { splitChildrenOfType } from "../utility/SearchChildren.js";
 import { Fallback } from "./Fallback.jsx";
 
 export interface ShowProperties {
@@ -20,10 +21,12 @@ export interface ShowProperties {
  * ```
  */
 export const Show: ParentElement<ShowProperties> & { Fallback: typeof Fallback } = (props) => {
-    const shouldShow = props.when();
+    const [fallback, normal] = splitChildrenOfType(props.children, Show.Fallback);
     return (<>
-        {shouldShow && props.children.filter((child) => child.type !== Show.Fallback)}
-        {!shouldShow && props.children.filter((child) => child.type === Show.Fallback).map((child) => child.props.children).flat()}
+        {props.when()
+            ? normal
+            : fallback.map((child) => child.props.children).flat()
+        }
     </>);
 }
 
