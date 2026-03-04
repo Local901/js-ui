@@ -44,9 +44,11 @@ export const Drawer: ParentElement<DialogProperties> = (props) => {
         return !(props.position && [Position.top, Position.bottom].includes(props.position));
     }
 
+    const classBase = `ui-drawer position-${props.position ?? Position.left} direction-${isHorizontal() ?  "horizontal": "vertical"}`;
+
     return <div
         ref={handleRef}
-        {...getDefaultProperties(props, `ui-drawer ui-drawer-root position-${props.position ?? Position.left} direction-${isHorizontal() ?  "horizontal": "vertical"}`)}
+        {...getDefaultProperties(props, `${classBase} ui-drawer-root`)}
         style={{
             ...(isHorizontal()
                 ? { width: !isOpen ? 0 : undefined }
@@ -55,7 +57,7 @@ export const Drawer: ParentElement<DialogProperties> = (props) => {
         }}
     >
         <div
-            className="ui-drawer-body"
+            className={`${classBase} ui-drawer-body ${props.className ?? ""}`.trimEnd()}
         >
             {props.children}
         </div>

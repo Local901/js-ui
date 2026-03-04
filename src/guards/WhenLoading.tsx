@@ -6,8 +6,8 @@ import { Show } from "./Show.jsx";
 /**
  * Guard internal elements until state is loading. Else `<Loading.Fallback>`
  */
-export const Loading: ParentElement<{ state: ProcessFlags }> & { Fallback: typeof Fallback } = (props) => {
+export const WhenLoading: ParentElement<{ state: ProcessFlags }> & { Fallback: typeof Fallback } = (props) => {
     return Show({ ...props, when: () => (props.state & ProcessFlags.LOADING) === ProcessFlags.LOADING });
 }
 
-Loading.Fallback = Fallback;
+WhenLoading.Fallback = Fallback;
