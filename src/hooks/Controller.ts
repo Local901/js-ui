@@ -1,3 +1,4 @@
+import { register } from "module";
 import { useRef } from "react";
 
 export interface BaseControls {
@@ -6,12 +7,13 @@ export interface BaseControls {
 }
 
 export interface Controls extends BaseControls {
-    switch: () => void;
+    flip: () => void;
     isOpen: () => boolean;
 }
 
 export interface Controller extends Controls {
     register: (controls: BaseControls) => () => void;
+    inverseController: Controller;
 }
 
 export function useController(open = false) {
@@ -29,8 +31,8 @@ export function useController(open = false) {
             }
         }
     }
-    
-    return {
+
+    const response = {
         open: () => {
             controlData.current.isOpen = true;
             call("open");
@@ -39,7 +41,7 @@ export function useController(open = false) {
             controlData.current.isOpen = false;
             call("close");
         },
-        switch: () => {
+        flip: () => {
             controlData.current.isOpen = !controlData.current.isOpen;
             call(controlData.current.isOpen ? "open" : "close");
         },
@@ -53,5 +55,18 @@ export function useController(open = false) {
                 );
             }
         },
-    } satisfies Controller;
+    } as Controller;
+
+    const inverse = {
+        open: response.close,
+        close: response.open,
+        flip: response.flip,
+        isOpen: () => !response.isOpen,
+        register: (controls) => response.register({ open: controls.close, close: controls.open }),
+        inverseController: response,
+    } satisfies Controller
+    
+    response.inverseController = inverse;
+
+    return response;
 }

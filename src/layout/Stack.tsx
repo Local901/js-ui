@@ -33,11 +33,11 @@ export const Stack: ParentElement<StackProperties> = (props) => {
         <div
             {...getDefaultProperties(
                 props,
-                `ui-stack direction-${props.direction ?? Direction.Column}`,
+                `ui-stack direction-${props.direction ?? "column"}`,
             )}
             style={{
                 display: "flex",
-                flexDirection: props.direction ?? Direction.Column,
+                flexDirection: props.direction ?? "column",
             }}
         >
             { props.children }

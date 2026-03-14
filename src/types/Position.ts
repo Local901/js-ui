@@ -1,7 +1,2 @@
 
-export enum Position {
-    left = "left",
-    top = "top",
-    right = "right",
-    bottom = "bottom",
-}
+export type Position = "left" | "top" | "right" | "bottom";

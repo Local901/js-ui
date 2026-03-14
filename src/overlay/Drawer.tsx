@@ -16,7 +16,7 @@ export interface DialogProperties extends DefaultProperties, ControllerEvents {
 export const Drawer: ParentElement<DialogProperties> = (props) => {
     const elRefs = useRef<{ root: HTMLDivElement | null, body: HTMLDivElement | null }>({ root: null, body: null });
     const isHorizontal = () => {
-        return !(props.position && [Position.top, Position.bottom].includes(props.position));
+        return !(props.position && ["top", "bottom"].includes(props.position));
     }
 
     const update = useCallback(() => {
@@ -26,7 +26,10 @@ export const Drawer: ParentElement<DialogProperties> = (props) => {
         }
         
         const property = isHorizontal() ? "width" : "height";
-        console.log(property, isHorizontal() ? body.offsetWidth : body.offsetHeight, isHorizontal() ? body.clientWidth : body.clientHeight);
+
+        if (props.controller.isOpen()) {
+            root.style.setProperty(property, `${isHorizontal() ? body.offsetWidth : body.offsetHeight}px`);
+        }
 
         body.addEventListener("resize", () => {
             if (!props.controller?.isOpen()) {
@@ -65,7 +68,7 @@ export const Drawer: ParentElement<DialogProperties> = (props) => {
         update();
     });
 
-    const classBase = `ui-drawer position-${props.position ?? Position.left} direction-${isHorizontal() ?  "horizontal": "vertical"}`;
+    const classBase = `ui-drawer position-${props.position ?? "left"} direction-${isHorizontal() ?  "horizontal": "vertical"}`;
 
     return <div
         ref={handleRootRef}
@@ -75,8 +78,8 @@ export const Drawer: ParentElement<DialogProperties> = (props) => {
             // If no controller is defined keep drawer open.
             [isHorizontal() ? "width" : "height"]: (props.controller?.isOpen() ?? true) ? undefined : 0,
             display: "inline-flex",
-            justifyContent: (props.position ?? Position.left) === Position.left ? "flex-end" : undefined,
-            alignItems: props.position === Position.top ? "flex-end" : undefined,
+            justifyContent: (props.position ?? "left") === "left" ? "flex-end" : undefined,
+            alignItems: props.position === "top" ? "flex-end" : undefined,
         }}
     >
         <div>
