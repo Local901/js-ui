@@ -110,5 +110,8 @@
     "tests",
     "dist",
     "vitest.config.ts"
+  ],
+  "include": [
+    "./src/**/*"
   ]
 }
