@@ -1,4 +1,3 @@
-import { register } from "module";
 import { useRef } from "react";
 
 export interface BaseControls {
