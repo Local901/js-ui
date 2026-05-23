@@ -8,4 +8,6 @@ export interface InputProperties<T> {
      * @default false
      */
     disabled?: boolean;
+    required?: boolean;
+    name?: string;
 }

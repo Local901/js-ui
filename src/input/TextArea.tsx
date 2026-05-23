@@ -11,7 +11,9 @@ export const TextArea: Element<TextAreaInputProperties> = (props) => {
     return <textarea
         {...getDefaultProperties(props, "ui-input-text-area")}
         value={value}
+        name={props.name}
         disabled={props.disabled}
+        required={props.required}
         onChange={(event) => props.input.set(event.target.value)}
     />;
 }

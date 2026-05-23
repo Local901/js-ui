@@ -1,8 +1,8 @@
 import type { ParentElement } from "../types/Element.js";
-import type { InputProperties } from "../types/Input.js";
 import { getDefaultProperties, type DefaultProperties } from "../types/Properties.js";
 
-export interface ButtonProperties extends DefaultProperties, InputProperties {
+export interface ButtonProperties extends DefaultProperties {
+    disabled?: boolean;
     onClick?: () => void;
 }
 

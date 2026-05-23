@@ -7,14 +7,16 @@ export interface UintInputProperties extends DefaultProperties, InputProperties<
     max?: number;
 }
 
-export const Uint: Element<UintInputProperties> = (props) => {
+export const UintInput: Element<UintInputProperties> = (props) => {
     const value = props.input.use();
 
     return <input
         {...getDefaultProperties(props, "ui-input-number ui-input-whole-number")}
         type="number"
         value={value}
+        name={props.name}
         disabled={props.disabled}
+        required={props.required}
         min={Math.max(0, props.min ?? 0)}
         max={(props.max)}
         onChange={(event) => props.input.set(Number.parseInt(event.target.value), "")}
