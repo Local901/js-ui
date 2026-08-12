@@ -6,14 +6,14 @@ import { useCallback } from "../hooks/Callback.js";
 import type { ControllerEvents } from "../types/Overlay.js";
 import { useRef } from "react";
 
-export interface DialogProperties extends DefaultProperties, ControllerEvents {
+export interface DrawerProperties extends DefaultProperties, ControllerEvents {
     /** Controller interface. Drawer will stay open if not defined */
     controller?: Controller,
     /** Which position should the drawer come from. */
     position?: Position,
 }
 
-export const Drawer: ParentElement<DialogProperties> = (props) => {
+export const Drawer: ParentElement<DrawerProperties> = (props) => {
     const elRefs = useRef<{ root: HTMLDivElement | null, body: HTMLDivElement | null }>({ root: null, body: null });
     const isHorizontal = () => {
         return !(props.position && ["top", "bottom"].includes(props.position));

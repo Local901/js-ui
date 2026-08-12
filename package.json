@@ -2,7 +2,7 @@
   "name": "@local901/js-ui",
   "version": "0.0.1",
   "description": "UI library for React",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "build": "tsc -p ./tsconfig.build.json",
     "start": "vite",
@@ -25,6 +25,32 @@
     "url": "https://github.com/local901/js-ui/issues"
   },
   "homepage": "https://github.com/local901/js-ui#readme",
+  "exports": {
+    "elements": {
+      "import": "./elements/index.jsx",
+      "types": "./elements/index.d.ts"
+    },
+    "guards": {
+      "import": "./guards/index.jsx",
+      "types": "./guards/index.d.ts"
+    },
+    "hooks": {
+      "import": "./hooks/index.jsx",
+      "types": "./hooks/index.d.ts"
+    },
+    "input": {
+      "import": "./input/index.jsx",
+      "types": "./input/index.d.ts"
+    },
+    "layout": {
+      "import": "./layout/index.jsx",
+      "types": "./layout/index.d.ts"
+    },
+    "overlay": {
+      "import": "./overlay/index.jsx",
+      "types": "./overlay/index.d.ts"
+    }
+  },
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
