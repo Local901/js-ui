@@ -26,29 +26,33 @@
   },
   "homepage": "https://github.com/local901/js-ui#readme",
   "exports": {
-    "elements": {
-      "import": "./elements/index.jsx",
-      "types": "./elements/index.d.ts"
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.jsx"
     },
-    "guards": {
-      "import": "./guards/index.jsx",
-      "types": "./guards/index.d.ts"
+    "./elements": {
+      "types": "./elements/index.d.ts",
+      "import": "./elements/index.jsx"
     },
-    "hooks": {
-      "import": "./hooks/index.jsx",
-      "types": "./hooks/index.d.ts"
+    "./guards": {
+      "types": "./guards/index.d.ts",
+      "import": "./guards/index.jsx"
     },
-    "input": {
-      "import": "./input/index.jsx",
-      "types": "./input/index.d.ts"
+    "./hooks": {
+      "types": "./hooks/index.d.ts",
+      "import": "./hooks/index.jsx"
     },
-    "layout": {
-      "import": "./layout/index.jsx",
-      "types": "./layout/index.d.ts"
+    "./input": {
+      "types": "./input/index.d.ts",
+      "import": "./input/index.jsx"
     },
-    "overlay": {
-      "import": "./overlay/index.jsx",
-      "types": "./overlay/index.d.ts"
+    "./layout": {
+      "types": "./layout/index.d.ts",
+      "import": "./layout/index.jsx"
+    },
+    "./overlay": {
+      "types": "./overlay/index.d.ts",
+      "import": "./overlay/index.jsx"
     }
   },
   "devDependencies": {
