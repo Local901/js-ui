@@ -17,6 +17,7 @@ jobs:
           node-version: "24"
       - run: "npm install"
       - run: "npm run build"
+      - run: "cp package.json dist/package.json"
       - run: "npm pkg delete devDependencies --prefix dist"
       - run: "cp README.md dist/README.md"
       - run: "echo \"//registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISH_KEY }}\" > ~/.npmrc"
