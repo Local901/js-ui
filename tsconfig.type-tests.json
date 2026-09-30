@@ -1,0 +1,14 @@
+{
+    "extends": "./tsconfig.build.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "declaration": false,
+        "rootDir": "."
+    },
+    "include": [
+        "src/hooks/Data.ts",
+        "src/hooks/Effect.ts",
+        "tests/types/**/*.ts"
+    ],
+    "exclude": ["node_modules", "dist"]
+}

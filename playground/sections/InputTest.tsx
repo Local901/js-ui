@@ -17,18 +17,18 @@ export const InputTest: Element = () => {
         <Stack direction="column">
             <Stack direction="row">
                 <label>Name</label>
-                <TextInput input={input.getInput("name")} />
+                <TextInput input={input.getData("name")} />
                 <Button onClick={() => input.reset("name")}>Reset text</Button>
                 <Button onClick={() => input.setDefault(input.get("name"), "name")}>Set as default</Button>
             </Stack>
             <Stack direction="row">
                 <label>Age</label>
-                <UintInput input={input.getInput("age")} />
+                <UintInput input={input.getData("age")} />
                 <Button onClick={() => input.reset("age")}>Reset number</Button>
                 <Button onClick={() => input.setDefault(input.get("age"), "age")}>Set as default</Button>
             </Stack>
             <p>
-                Hello <DataValue data={input.getInput("name")}/>. You are <DataValue data={input.getInput("age")}/> years old.
+                Hello <DataValue data={input.getData("name")}/>. You are <DataValue data={input.getData("age")}/> years old.
             </p>
         </Stack>
     </>)

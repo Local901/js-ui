@@ -3,22 +3,13 @@ import { useEffect } from "./Effect.js";
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined | Date | URL | Uint8Array | File;
 
-type IsTuple<T> =
-    T extends readonly unknown[]
-        ? number extends T['length']
-            ? false
-            : true
-        : false;
-
 type IsPlainObject<T> =
-    T extends object
-        ? T extends unknown[]
-            ? IsTuple<T> extends true
-                ? true
-                : false
-            : T extends Function
+    T extends readonly unknown[]
+        ? false
+        : T extends object
+            ? T extends Function
                 ? false
-                : T extends Primitive 
+                : T extends Primitive
                     ? false
                     : true
         : false;
@@ -47,10 +38,7 @@ type PathValue<T, P extends Paths<T>> =
                 ? T
                 : never;
 
-type DataNode<T> = Data<T>;
-// T extends unknown[]
-//     ? ArrayData<T>
-//     : Data<T>;
+type DataNode<T> = Extract<T, readonly unknown[]> extends never ? Data<T> : ArrayData<T>;
 
 export interface Data<T> {
     use(): T;
@@ -104,25 +92,26 @@ export interface ArrayDataItem<T> {
     data: DataNode<T>;
 };
 
-type AssertArrayDataItems<T> = T extends [infer I, ...infer rest]
-    ? [ArrayDataItem<I>, ...AssertArrayDataItems<rest>]
-    : never;
-
-type AssertArrayDataItem<T, K extends string | number> = T extends unknown[]
-    ? K extends number
-        ? ArrayDataItem<T[K]>
-        : ArrayDataItem<T[number]>
-    : never;
+type ArrayItemValue<T> = T extends readonly (infer I)[] ? I : never;
+type ArrayItemValueAt<T, K extends string | number> = K extends number
+    ? T extends readonly unknown[]
+        ? number extends K
+            ? ArrayItemValue<T>
+            : `${K}` extends keyof T
+                ? T[`${K}` & keyof T]
+                : ArrayItemValue<T>
+        : never
+    : ArrayItemValue<T>;
 
 export interface ArrayData<T> extends Data<T> {
-    useItems(): AssertArrayDataItems<T>[];
-    getItems(): AssertArrayDataItems<T>[];
-    useItem<K extends string | number>(keyOrIndex: K): AssertArrayDataItem<T, K>;
-    getItem<K extends string | number>(keyOrIndex: K): AssertArrayDataItem<T, K>;
+    useItems(): ArrayDataItem<ArrayItemValue<T>>[];
+    getItems(): ArrayDataItem<ArrayItemValue<T>>[];
+    useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>>;
+    getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>>;
 
     move(key: string, index: number): void;
-    add(item: T): void;
-    insert(item: T, index: number): void;
+    add(item: ArrayItemValue<T>): void;
+    insert(item: ArrayItemValue<T>, index: number): void;
     remove(key: string): void;
 }
 
@@ -137,7 +126,7 @@ function mergePaths(root: string, subPath: string = ""): string {
 }
 
 class DataClass<ROOT, T> implements Data<T> {
-    private reducers: ActionDispatch<[]>[] = [];
+    private reducers = new Set<ActionDispatch<[]>>();
 
     public constructor(
         protected rootInput: RootData<ROOT>,
@@ -149,10 +138,9 @@ class DataClass<ROOT, T> implements Data<T> {
         const [_value, reducer] = useReducer((prev) => ++prev, 0);
 
         useEffect(() => {
-            const index = this.reducers.length;
-            this.reducers.push(reducer);
+            this.reducers.add(reducer);
 
-            return () => this.reducers.splice(index, 1);
+            return () => this.reducers.delete(reducer);
         }, [reducer])
 
         return this.get("") as T;
@@ -199,7 +187,10 @@ type InternalData = {
 class RootData<T> {
     private inputs: Record<string, InternalData> = {};
 
-    public constructor(private defaults: T) {
+    public constructor(
+        private defaults: T,
+        private readonly onChange?: (value: T) => void,
+    ) {
         this.processValue("", defaults);
     }
 
@@ -240,37 +231,30 @@ class RootData<T> {
     }
 
     private insertValue(path: string, value: unknown) {
-        let currentValue = this.processValue(path, value);
+        const currentValue = this.processValue(path, value);
 
         // Walk down to create objects.
         const parts = path.split(".");
-        const numberMatch = parts[parts.length - 1]?.match(/\d+/)
-        const tupleIndex = numberMatch ? parts.length - 1 : -1;
+        if (path === "") {
+            return;
+        }
+        if (parts.length === 1) {
+            const parent = this.inputs[""]?.current;
+            if (parent && typeof parent === "object" && !Array.isArray(parent)) {
+                (parent as Record<string, unknown>)[parts[0]!] = currentValue;
+            }
+            return;
+        }
         for (let end = parts.length - 1; end > 0; end--) {
             const subPath = parts.slice(0, end).join(".");
             const data = this.inputs[subPath];
             if (!data?.current) {
-                currentValue = end === tupleIndex
-                    ? (() => {
-                        const a = [];
-                        a[Number.parseInt(numberMatch![0])] = currentValue;
-                        return a;
-                    })()
-                    : { [parts[end - 1] as string]: currentValue };
+                const parentValue = { [parts[end - 1] as string]: currentValue };
                 this.inputs[subPath] ??= {
-                    current: currentValue,
+                    current: parentValue,
                 };
-                this.inputs[subPath].current = currentValue;
+                this.inputs[subPath].current = parentValue;
                 continue;
-            }
-            if (end === tupleIndex) {
-                if (!Array.isArray(data.current)) {
-                    throw new Error(`Expected tuple type at ${subPath}`);
-                }
-                data.current[Number.parseInt(numberMatch![0])] = currentValue;
-
-                // No need to go deeper.
-                break;
             }
             if (
                 typeof data.current !== "object" ||
@@ -287,41 +271,21 @@ class RootData<T> {
     }
 
     private getDataInternal(path: string): InternalData | undefined {
-        if (path in this.inputs) {
-            return this.inputs[path];
-        }
-
-        // tuple fallback. (expect no record object in tuple)
-        const match = path.match(/[\.^]-?\d+$/);
-        if (match) {
-            const tuplePath = path.substring(0, match.index);
-            if (!(tuplePath in this.inputs)) {
-                // Undefined for now as we can create the relations on set.
-                return undefined;
-            }
-            const tuple = this.inputs[tuplePath];
-            if (!tuple) {
-                // Undefined for now as we can create the relations on set.
-                return undefined;
-            }
-            if (!Array.isArray(tuple.current)) {
-                throw new Error(`Parent of ${path} has to be a tuple.`);
-            }
-            // Add relation since it already exists in the tuple.
-            this.inputs[path] = {
-                current: tuple.current.at(Number.parseInt(match[0].replace(".", ""))),
-            }
-        }
-
-        return undefined;
+        return this.inputs[path];
     }
 
-    private triggerRerender(path: string): void {
+    private triggerRerender(path: string, excludedData?: DataNode<unknown>): void {
         const keys = Object.keys(this.inputs)
-            .filter((k) => path === "" || (k.startsWith(path) && (k.length === path.length || k[path.length] === ".")) || path.startsWith(`${k}.`))
+            .filter((k) => path === "" || k === "" || (k.startsWith(path) && (k.length === path.length || k[path.length] === ".")) || path.startsWith(`${k}.`))
             .sort((k1, k2) => k1.length - k2.length);
         for (const key of keys){
-            this.getDataInternal(key)?.data?.rerender();
+            const data = this.getDataInternal(key)?.data;
+            if (data && data !== excludedData) {
+                data.rerender();
+            }
+        }
+        if (path === "") {
+            this.onChange?.(this.get("") as T);
         }
     }
 
@@ -334,7 +298,7 @@ class RootData<T> {
         } else if (!this.inputs[path].data) {
             this.inputs[path].data = new ArrayDataClass<T, PathValue<T, P>>(this, path) as unknown as DataNode<unknown>;
         }
-        return this.inputs[path].data as DataNode<PathValue<T, P>>;
+        return this.inputs[path].data as unknown as DataNode<PathValue<T, P>>;
     }
     public get<P extends Paths<T>>(path: P): PathValue<T, P> {
         return this.getDataInternal(path)?.current as PathValue<T, P>;
@@ -344,6 +308,13 @@ class RootData<T> {
         // Will process Value and update parent object. (We always want to do this on set.)
         this.deepClear(path);
         this.insertValue(path, value);
+
+        for (const [inputPath, input] of Object.entries(this.inputs)) {
+            const isWithinChangedPath = path === "" || inputPath === path || inputPath.startsWith(`${path}.`);
+            if (isWithinChangedPath && input.data instanceof ArrayDataClass && Array.isArray(input.current)) {
+                input.data.onArrayReplaced();
+            }
+        }
 
         this.triggerRerender(path);
     }
@@ -399,7 +370,9 @@ class RootData<T> {
 
 class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T> {
     private order: string[] = [];
-    private roots: Record<string, RootData<T>> = {};
+    private items = new Map<string, ArrayDataItem<ArrayItemValue<T>>>();
+    private itemsInitialized = false;
+    private nextKey = 0;
 
     private assertArray(data: T): asserts data is T & unknown[] {
         if (Array.isArray(data)) {
@@ -408,53 +381,120 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
         throw new Error("Array data functions can only be used when the data is an array.");
     }
 
-    public useItems(): AssertArrayDataItems<T> {
-        throw new Error("Method not implemented.");
+    private ensureItems(): ArrayItemValue<T>[] {
+        const data = this.get() as T;
+        this.assertArray(data);
+
+        if (!this.itemsInitialized) {
+            this.itemsInitialized = true;
+            this.order = [];
+            this.items.clear();
+            for (let index = 0; index < data.length; index++) {
+                const created = this.createItem(data[index] as ArrayItemValue<T>);
+                data[index] = created.value;
+            }
+        }
+        return data as ArrayItemValue<T>[];
     }
-    public getItems(): AssertArrayDataItems<T> {
-        throw new Error("Method not implemented.");
+
+    private createItem(
+        value: ArrayItemValue<T>,
+        index = this.order.length,
+    ): { item: ArrayDataItem<ArrayItemValue<T>>; value: ArrayItemValue<T> } {
+        const key = String(this.nextKey++);
+        let root: RootData<ArrayItemValue<T>>;
+        root = new RootData(value, (updatedValue) => this.updateItemValue(key, updatedValue));
+        const item: ArrayDataItem<ArrayItemValue<T>> = {
+            key,
+            index: () => this.order.indexOf(key),
+            data: root.getData("") as DataNode<ArrayItemValue<T>>,
+        };
+        this.order.splice(index, 0, key);
+        this.items.set(key, item);
+        return { item, value: root.get("") as ArrayItemValue<T> };
     }
-    public useItem<K extends string | number>(keyOrIndex: K): AssertArrayDataItem<T, K> {
-        void keyOrIndex;
-        throw new Error("Method not implemented.");
+
+    private updateItemValue(key: string, value: ArrayItemValue<T>): void {
+        if (this.items.has(key)) {
+            const index = this.order.indexOf(key);
+            if (index >= 0) {
+                (this.get() as unknown[])[index] = value;
+            }
+        }
     }
-    public getItem<K extends string | number>(keyOrIndex: K): AssertArrayDataItem<T, K> {
-        void keyOrIndex;
-        throw new Error("Method not implemented.");
+
+    public onArrayReplaced(): void {
+        this.itemsInitialized = false;
+        this.order = [];
+        this.items.clear();
+        if (Array.isArray(this.get())) {
+            this.ensureItems();
+        }
+    }
+
+    public useItems(): ArrayDataItem<ArrayItemValue<T>>[] {
+        this.use();
+        return this.getItems();
+    }
+    public getItems(): ArrayDataItem<ArrayItemValue<T>>[] {
+        this.ensureItems();
+        return this.order.map((key) => this.items.get(key)!);
+    }
+    public useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
+        this.use();
+        return this.getItem(keyOrIndex);
+    }
+    public getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
+        this.ensureItems();
+        const index = typeof keyOrIndex === "number"
+            ? keyOrIndex
+            : this.order.indexOf(keyOrIndex);
+        const key = this.order[index];
+        const item = key === undefined ? undefined : this.items.get(key);
+        if (!item) {
+            throw new RangeError(`No array item exists at ${String(keyOrIndex)}.`);
+        }
+        return item as ArrayDataItem<ArrayItemValueAt<T, K>>;
     }
     public move(key: string, index: number): void {
-        const data = this.get() as T;
-        this.assertArray(data);
+        const data = this.ensureItems();
+        const currentIndex = this.order.indexOf(key);
+        if (currentIndex < 0) {
+            return;
+        }
+        if (!Number.isInteger(index) || index < 0 || index >= this.order.length) {
+            throw new RangeError(`Array index ${index} is out of range.`);
+        }
+        if (currentIndex === index) {
+            return;
+        }
 
-        void key;
-        void index;
-        throw new Error("Method not implemented.");
+        const [movedKey] = this.order.splice(currentIndex, 1);
+        this.order.splice(index, 0, movedKey!);
+        const [movedValue] = data.splice(currentIndex, 1);
+        data.splice(index, 0, movedValue!);
+        this.rerender();
     }
-    public add(item: T): void {
-        const data = this.get() as T;
-        this.assertArray(data);
-
-        void item;
-        throw new Error("Method not implemented.");
+    public add(item: ArrayItemValue<T>): void {
+        this.insert(item, this.ensureItems().length);
     }
-    public insert(item: T, index: number): void {
-        const data = this.get() as T;
-        this.assertArray(data);
-
-        void item;
-        void index;
-        throw new Error("Method not implemented.");
+    public insert(item: ArrayItemValue<T>, index: number): void {
+        const data = this.ensureItems();
+        if (!Number.isInteger(index) || index < 0 || index > data.length) {
+            throw new RangeError(`Array index ${index} is out of range.`);
+        }
+        const arrayItem = this.createItem(item, index);
+        data.splice(index, 0, arrayItem.value);
+        this.rerender();
     }
     public remove(key: string): void {
-        const data = this.get() as T;
-        this.assertArray(data);
-
+        const data = this.ensureItems();
         const index = this.order.indexOf(key);
         if (index < 0) {
             return;
         }
-        delete this.roots[key];
         this.order.splice(index, 1);
+        this.items.delete(key);
         data.splice(index, 1);
         this.rerender();
     }
