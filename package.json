@@ -30,31 +30,20 @@
       "types": "./index.d.ts",
       "import": "./index.jsx"
     },
-    "./elements": {
-      "types": "./elements/index.d.ts",
-      "import": "./elements/index.jsx"
+    "./jsx/*": {
+      "types": "./jsx/*.d.ts",
+      "import": "./jsx/*.jsx"
     },
-    "./guards": {
-      "types": "./guards/index.d.ts",
-      "import": "./guards/index.jsx"
+    "./hooks/*": {
+      "types": "./hooks/*.d.ts",
+      "import": "./hooks/*.js"
     },
-    "./hooks": {
-      "types": "./hooks/index.d.ts",
-      "import": "./hooks/index.jsx"
-    },
-    "./input": {
-      "types": "./input/index.d.ts",
-      "import": "./input/index.jsx"
-    },
-    "./layout": {
-      "types": "./layout/index.d.ts",
-      "import": "./layout/index.jsx"
-    },
-    "./overlay": {
-      "types": "./overlay/index.d.ts",
-      "import": "./overlay/index.jsx"
+    "./theme/*": {
+      "types": "./theme/*.d.ts",
+      "import": "./theme/*.js"
     }
   },
+  "sideEffects": false,
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",

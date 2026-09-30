@@ -11,7 +11,7 @@ export type Element<PROPS extends Properties = {}> = (
 
 export type ParentElement<
     PROPS extends Properties = {},
-    CHILDREN extends ChildType = ChildType
+    CHILDREN extends ChildType | ChildFactory | undefined = ChildType
 > = (
     props: PROPS & { children?: CHILDREN }
 ) => JSX.Element;

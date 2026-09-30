@@ -1,0 +1,16 @@
+export const ButtonStyle = ".ui-button";
+export const InputStyle = ".ui-input";
+export const CheckBoxStyle = ".ui-input-checkbox";
+export const ColorInputStyle = ".ui-input-color";
+export const DateInputStyle = ".ui-input-date";
+export const EmailInputStyle = ".ui-input-email";
+export const FileInputStyle = ".ui-input-file";
+export const MonthInputStyle = ".ui-input-month";
+export const PasswordInputStyle = ".ui-input-password";
+export const RadioStyle = ".ui-input-radio";
+export const RangeInputStyle = ".ui-input-range";
+export const SelectStyle = ".ui-input-select";
+export const TextAreaStyle = ".ui-input-text-area";
+export const TextInputStyle = ".ui-input-text";
+export const TimeInputStyle = ".ui-input-time";
+export const UintInputStyle = ".ui-input-uint";

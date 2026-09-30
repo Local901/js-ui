@@ -1,13 +1,13 @@
-import { useInput } from "../../src/hooks/Input.ts";
-import { Button } from "../../src/input/Button.tsx";
-import { TextInput } from "../../src/input/TextInput.tsx";
-import { UintInput } from "../../src/input/UintInput.tsx";
-import { InputValue } from "../../src/input/InputValue.tsx";
-import { Stack } from "../../src/layout/Stack.tsx";
+import { useData } from "../../src/hooks/Data.ts";
+import { Button } from "../../src/jsx/input/Button.tsx";
+import { TextInput } from "../../src/jsx/input/TextInput.tsx";
+import { UintInput } from "../../src/jsx/input/UintInput.tsx";
+import { DataValue } from "../../src/jsx/output/DataValue.tsx";
+import { Stack } from "../../src/jsx/layout/Stack.tsx";
 import type { Element } from "../../src/types/Element.ts";
 
 export const InputTest: Element = () => {
-    const input = useInput({
+    const input = useData({
         age: 0,
         name: "",
     });
@@ -28,7 +28,7 @@ export const InputTest: Element = () => {
                 <Button onClick={() => input.setDefault(input.get("age"), "age")}>Set as default</Button>
             </Stack>
             <p>
-                Hello <InputValue input={input.getInput("name")}/>. You are <InputValue input={input.getInput("age")}/> years old.
+                Hello <DataValue data={input.getInput("name")}/>. You are <DataValue data={input.getInput("age")}/> years old.
             </p>
         </Stack>
     </>)
