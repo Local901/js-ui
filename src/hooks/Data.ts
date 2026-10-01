@@ -41,7 +41,7 @@ type PathValue<T, P extends Paths<T>> =
 type DataNode<T> = Extract<T, readonly unknown[]> extends never ? Data<T> : ArrayData<T>;
 
 export interface Data<T> {
-    use(): T;
+    use(rerenderFilter?: (newValue: T, oldValue: T) => boolean): T;
     getData<const P extends Paths<T>>(path: P): DataNode<PathValue<T, P>>;
     /**
      * Get the value of the input or a sub-value.
@@ -126,7 +126,7 @@ function mergePaths(root: string, subPath: string = ""): string {
 }
 
 class DataClass<ROOT, T> implements Data<T> {
-    private reducers = new Set<ActionDispatch<[]>>();
+    private reducers: ActionDispatch<[]>[] = [];
 
     public constructor(
         protected rootInput: RootData<ROOT>,
@@ -134,16 +134,24 @@ class DataClass<ROOT, T> implements Data<T> {
     ) {}
 
     /** @inheritDoc */
-    public use(): T {
+    public use(rerenderFilter?: (newValue: T, oldValue: T) => boolean): T {
         const [_value, reducer] = useReducer((prev) => ++prev, 0);
 
+        const result = this.get("") as T;
         useEffect(() => {
-            this.reducers.add(reducer);
+            const rerender = rerenderFilter
+                ? () => {
+                    if (rerenderFilter(result, this.get("") as T)) {
+                        reducer();
+                    }
+                }
+                : reducer;
+            this.reducers.push(rerender);
 
-            return () => this.reducers.delete(reducer);
+            return () => this.reducers.splice(this.reducers.indexOf(rerender), 1);
         }, [reducer])
 
-        return this.get("") as T;
+        return result;
     }
     /** @inheritDoc */
     public rerender = (): void => {
@@ -176,6 +184,138 @@ class DataClass<ROOT, T> implements Data<T> {
     /** @inheritDoc */
     public setDefault = <const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void => {
         return this.rootInput.setDefault(mergePaths(this.path, path) as Paths<ROOT>, value as PathValue<ROOT, Paths<ROOT>>);
+    }
+}
+
+class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T> {
+    private order: string[] = [];
+    private items = new Map<string, ArrayDataItem<ArrayItemValue<T>>>();
+    private itemsInitialized = false;
+    private nextKey = 0;
+
+    private assertArray(data: T): asserts data is T & unknown[] {
+        if (Array.isArray(data)) {
+            return;
+        }
+        throw new Error("Array data functions can only be used when the data is an array.");
+    }
+
+    private ensureItems(): ArrayItemValue<T>[] {
+        const data = this.get() as T;
+        this.assertArray(data);
+
+        if (!this.itemsInitialized) {
+            this.itemsInitialized = true;
+            this.order = [];
+            this.items.clear();
+            for (let index = 0; index < data.length; index++) {
+                const created = this.createItem(data[index] as ArrayItemValue<T>);
+                data[index] = created.value;
+            }
+        }
+        return data as ArrayItemValue<T>[];
+    }
+
+    private createItem(
+        value: ArrayItemValue<T>,
+        index = this.order.length,
+    ): { item: ArrayDataItem<ArrayItemValue<T>>; value: ArrayItemValue<T> } {
+        const key = String(this.nextKey++);
+        let root: RootData<ArrayItemValue<T>>;
+        root = new RootData(value, (updatedValue) => this.updateItemValue(key, updatedValue));
+        const item: ArrayDataItem<ArrayItemValue<T>> = {
+            key,
+            index: () => this.order.indexOf(key),
+            data: root.getData("") as DataNode<ArrayItemValue<T>>,
+        };
+        this.order.splice(index, 0, key);
+        this.items.set(key, item);
+        return { item, value: root.get("") as ArrayItemValue<T> };
+    }
+
+    private updateItemValue(key: string, value: ArrayItemValue<T>): void {
+        if (this.items.has(key)) {
+            const index = this.order.indexOf(key);
+            if (index >= 0) {
+                (this.get() as unknown[])[index] = value;
+            }
+        }
+    }
+
+    public onArrayReplaced(): void {
+        this.itemsInitialized = false;
+        this.order = [];
+        this.items.clear();
+        if (Array.isArray(this.get())) {
+            this.ensureItems();
+        }
+    }
+
+    public useItems(): ArrayDataItem<ArrayItemValue<T>>[] {
+        this.use();
+        return this.getItems();
+    }
+    public getItems(): ArrayDataItem<ArrayItemValue<T>>[] {
+        this.ensureItems();
+        return this.order.map((key) => this.items.get(key)!);
+    }
+    public useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
+        this.use();
+        return this.getItem(keyOrIndex);
+    }
+    public getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
+        this.ensureItems();
+        const index = typeof keyOrIndex === "number"
+            ? keyOrIndex
+            : this.order.indexOf(keyOrIndex);
+        const key = this.order[index];
+        const item = key === undefined ? undefined : this.items.get(key);
+        if (!item) {
+            throw new RangeError(`No array item exists at ${String(keyOrIndex)}.`);
+        }
+        return item as ArrayDataItem<ArrayItemValueAt<T, K>>;
+    }
+    public move(key: string, index: number): void {
+        const data = this.ensureItems();
+        const currentIndex = this.order.indexOf(key);
+        if (currentIndex < 0) {
+            return;
+        }
+        if (!Number.isInteger(index) || index < 0 || index >= this.order.length) {
+            throw new RangeError(`Array index ${index} is out of range.`);
+        }
+        if (currentIndex === index) {
+            return;
+        }
+
+        const [movedKey] = this.order.splice(currentIndex, 1);
+        this.order.splice(index, 0, movedKey!);
+        const [movedValue] = data.splice(currentIndex, 1);
+        data.splice(index, 0, movedValue!);
+        this.rerender();
+    }
+    public add(item: ArrayItemValue<T>): void {
+        this.insert(item, this.ensureItems().length);
+    }
+    public insert(item: ArrayItemValue<T>, index: number): void {
+        const data = this.ensureItems();
+        if (!Number.isInteger(index) || index < 0 || index > data.length) {
+            throw new RangeError(`Array index ${index} is out of range.`);
+        }
+        const arrayItem = this.createItem(item, index);
+        data.splice(index, 0, arrayItem.value);
+        this.rerender();
+    }
+    public remove(key: string): void {
+        const data = this.ensureItems();
+        const index = this.order.indexOf(key);
+        if (index < 0) {
+            return;
+        }
+        this.order.splice(index, 1);
+        this.items.delete(key);
+        data.splice(index, 1);
+        this.rerender();
     }
 }
 
@@ -365,138 +505,6 @@ class RootData<T> {
 
     public reset<P extends Paths<T>>(path: P): void {
         this.set(path, this.getDefault(path));
-    }
-}
-
-class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T> {
-    private order: string[] = [];
-    private items = new Map<string, ArrayDataItem<ArrayItemValue<T>>>();
-    private itemsInitialized = false;
-    private nextKey = 0;
-
-    private assertArray(data: T): asserts data is T & unknown[] {
-        if (Array.isArray(data)) {
-            return;
-        }
-        throw new Error("Array data functions can only be used when the data is an array.");
-    }
-
-    private ensureItems(): ArrayItemValue<T>[] {
-        const data = this.get() as T;
-        this.assertArray(data);
-
-        if (!this.itemsInitialized) {
-            this.itemsInitialized = true;
-            this.order = [];
-            this.items.clear();
-            for (let index = 0; index < data.length; index++) {
-                const created = this.createItem(data[index] as ArrayItemValue<T>);
-                data[index] = created.value;
-            }
-        }
-        return data as ArrayItemValue<T>[];
-    }
-
-    private createItem(
-        value: ArrayItemValue<T>,
-        index = this.order.length,
-    ): { item: ArrayDataItem<ArrayItemValue<T>>; value: ArrayItemValue<T> } {
-        const key = String(this.nextKey++);
-        let root: RootData<ArrayItemValue<T>>;
-        root = new RootData(value, (updatedValue) => this.updateItemValue(key, updatedValue));
-        const item: ArrayDataItem<ArrayItemValue<T>> = {
-            key,
-            index: () => this.order.indexOf(key),
-            data: root.getData("") as DataNode<ArrayItemValue<T>>,
-        };
-        this.order.splice(index, 0, key);
-        this.items.set(key, item);
-        return { item, value: root.get("") as ArrayItemValue<T> };
-    }
-
-    private updateItemValue(key: string, value: ArrayItemValue<T>): void {
-        if (this.items.has(key)) {
-            const index = this.order.indexOf(key);
-            if (index >= 0) {
-                (this.get() as unknown[])[index] = value;
-            }
-        }
-    }
-
-    public onArrayReplaced(): void {
-        this.itemsInitialized = false;
-        this.order = [];
-        this.items.clear();
-        if (Array.isArray(this.get())) {
-            this.ensureItems();
-        }
-    }
-
-    public useItems(): ArrayDataItem<ArrayItemValue<T>>[] {
-        this.use();
-        return this.getItems();
-    }
-    public getItems(): ArrayDataItem<ArrayItemValue<T>>[] {
-        this.ensureItems();
-        return this.order.map((key) => this.items.get(key)!);
-    }
-    public useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
-        this.use();
-        return this.getItem(keyOrIndex);
-    }
-    public getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
-        this.ensureItems();
-        const index = typeof keyOrIndex === "number"
-            ? keyOrIndex
-            : this.order.indexOf(keyOrIndex);
-        const key = this.order[index];
-        const item = key === undefined ? undefined : this.items.get(key);
-        if (!item) {
-            throw new RangeError(`No array item exists at ${String(keyOrIndex)}.`);
-        }
-        return item as ArrayDataItem<ArrayItemValueAt<T, K>>;
-    }
-    public move(key: string, index: number): void {
-        const data = this.ensureItems();
-        const currentIndex = this.order.indexOf(key);
-        if (currentIndex < 0) {
-            return;
-        }
-        if (!Number.isInteger(index) || index < 0 || index >= this.order.length) {
-            throw new RangeError(`Array index ${index} is out of range.`);
-        }
-        if (currentIndex === index) {
-            return;
-        }
-
-        const [movedKey] = this.order.splice(currentIndex, 1);
-        this.order.splice(index, 0, movedKey!);
-        const [movedValue] = data.splice(currentIndex, 1);
-        data.splice(index, 0, movedValue!);
-        this.rerender();
-    }
-    public add(item: ArrayItemValue<T>): void {
-        this.insert(item, this.ensureItems().length);
-    }
-    public insert(item: ArrayItemValue<T>, index: number): void {
-        const data = this.ensureItems();
-        if (!Number.isInteger(index) || index < 0 || index > data.length) {
-            throw new RangeError(`Array index ${index} is out of range.`);
-        }
-        const arrayItem = this.createItem(item, index);
-        data.splice(index, 0, arrayItem.value);
-        this.rerender();
-    }
-    public remove(key: string): void {
-        const data = this.ensureItems();
-        const index = this.order.indexOf(key);
-        if (index < 0) {
-            return;
-        }
-        this.order.splice(index, 1);
-        this.items.delete(key);
-        data.splice(index, 1);
-        this.rerender();
     }
 }
 

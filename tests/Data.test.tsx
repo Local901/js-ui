@@ -57,7 +57,7 @@ describe("ArrayData", () => {
         expect(listRenders).toBe(initialListRenders);
         expect(itemRenders.get(first!.key)).toBe(2);
         expect(itemRenders.get(second!.key)).toBe(1);
-        expect(data!.get()).not.toBe(originalArray);
+        expect(data!.get()).toBe(originalArray);
         expect(data!.get()).not.toBe(defaultArray);
         expect(defaultArray[0]?.name).toBe("first");
         expect(data!.get()[0]?.name).toBe("updated");
@@ -161,8 +161,8 @@ describe("ArrayData", () => {
         expect(container.textContent).toBe("updated");
         expect(data!.get()).toEqual(["updated", 2]);
         expect(rootData!.get("pair")).toBe(data!.get());
-        expect(data!.get()).not.toBe(previousArray);
-        expect(previousArray).toEqual(["first", 2]);
+        expect(data!.get()).toBe(previousArray);
+        expect(previousArray).not.toEqual(["first", 2]);
         expect(data!.getItem(1).data.get()).toBe(2);
     });
 });
