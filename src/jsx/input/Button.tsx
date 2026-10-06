@@ -8,7 +8,7 @@ export interface ButtonProperties extends DefaultProperties {
 
 export const Button: ParentElement<ButtonProperties> = (props) => {
     return <button
-        {...getDefaultProperties(props, "ui-button")}
+        {...getDefaultProperties(props, "ui-button clickable")}
         disabled={props.disabled}
         onClick={() => props.onClick?.()}
     >

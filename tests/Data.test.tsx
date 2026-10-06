@@ -101,7 +101,7 @@ describe("ArrayData", () => {
         expect(container.textContent).toBe("secondfirstthird");
         expect(data!.getItems()).toHaveLength(3);
 
-        act(() => data!.insert({ name: "inserted" }, 1));
+        act(() => data!.insert(1 ,{ name: "inserted" }));
 
         const insertedKey = data!.getItem(1).key;
         expect(container.textContent).toBe("secondinsertedfirstthird");

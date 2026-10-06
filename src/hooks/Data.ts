@@ -26,19 +26,21 @@ type NestedPaths<T> =
 type Paths<T> = "" | NestedPaths<T>;
 
 type PathValue<T, P extends Paths<T>> =
-    P extends `${infer K}.${infer Rest}`
-        ? K extends keyof T
-            ? Rest extends Paths<T[K]>
-                ? PathValue<T[K], Rest>
+    P extends ""
+        ? T
+        : P extends `${infer K}.${infer Rest}`
+            ? K extends keyof T
+                ? Rest extends Paths<T[K]>
+                    ? PathValue<T[K], Rest>
+                    : never
                 : never
-            : never
-        : P extends keyof T
-            ? T[P]
-            : P extends ""
-                ? T
-                : never;
+            : P extends keyof T
+                ? T[P]
+                : P extends ""
+                    ? T
+                    : never;
 
-type DataNode<T> = Extract<T, readonly unknown[]> extends never ? Data<T> : ArrayData<T>;
+export type DataNode<T> = Extract<T, readonly unknown[]> extends never ? Data<T> : ArrayData<T>;
 
 export interface Data<T> {
     use(rerenderFilter?: (newValue: T, oldValue: T) => boolean): T;
@@ -51,39 +53,43 @@ export interface Data<T> {
      * @param path Path to the value.
      * @returns The value that is currently stored.
      */
-    get<const P extends Paths<T>>(path?: P): PathValue<T, P>;
+    get<const P extends Paths<T> = "">(path?: P): PathValue<T, P>;
     /**
      * Set a value in the input. This will trigger rerenders.
      *
      * @param value The value to set.
      * @param path Path to the value.
      */
-    set<const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void;
+    set<const P extends Paths<T> = "">(value: PathValue<T, P>, path?: P): void;
     /**
      * Reset the value back to the default value. This will trigger rerenders.
      * 
      * @param path Path to the value.
      */
-    reset<const P extends Paths<T>>(path?: P): void;
+    reset<const P extends Paths<T> = "">(path?: P): void;
     /**
      * Get the default value.
      * 
      * @param path Path to the value.
      */
-    getDefault<const P extends Paths<T>>(path?: P): PathValue<T, P>;
+    getDefault<const P extends Paths<T> = "">(path?: P): PathValue<T, P>;
     /**
      * Will update the default value. But this will not trigger rerenders.
      * 
      * @param value The value to set.
      * @param path Path to the value.
      */
-    setDefault<const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void;
+    setDefault<const P extends Paths<T> = "">(value: PathValue<T, P>, path?: P): void;
     /**
-     * Trigger rerender fot this input.
-     * 
-     * This is for internal use. It will rerender all components that use this input.
+     * Trigger rerender for this data as if it was modified.
      */
     rerender(): void;
+    /**
+     * Trigger rerender for this data.
+     * 
+     * This is for internal use. It will rerender all components that use this data.
+     */
+    localRerender(): void;
 }
 
 export interface ArrayDataItem<T> {
@@ -108,10 +114,11 @@ export interface ArrayData<T> extends Data<T> {
     getItems(): ArrayDataItem<ArrayItemValue<T>>[];
     useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>>;
     getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>>;
+    setItem<const K extends string | number>(keyOrIndex: K, value: ArrayItemValueAt<T, K>): void;
 
     move(key: string, index: number): void;
-    add(item: ArrayItemValue<T>): void;
-    insert(item: ArrayItemValue<T>, index: number): void;
+    add(...items: ArrayItemValue<T>[]): void;
+    insert(index: number, ...items: ArrayItemValue<T>[]): void;
     remove(key: string): void;
 }
 
@@ -154,35 +161,38 @@ class DataClass<ROOT, T> implements Data<T> {
         return result;
     }
     /** @inheritDoc */
-    public rerender = (): void => {
+    public localRerender(): void {
         for(const reducer of this.reducers) {
             try {
                 reducer();
             } catch (e) {}
         }
     }
+    public rerender(): void {
+        this.rootInput.triggerRerender(this.path);
+    }
     /** @inheritDoc */
-    public getData = <const P extends Paths<T>>(path: P): DataNode<PathValue<T, P>> => {
+    public getData<const P extends Paths<T>>(path: P): DataNode<PathValue<T, P>> {
         return this.rootInput.getData(mergePaths(this.path, path) as Paths<ROOT>) as DataNode<PathValue<T, P>>;
     }
     /** @inheritDoc */
-    public get = <const P extends Paths<T>>(path?: P): PathValue<T, P> => {
+    public get<const P extends Paths<T>>(path?: P): PathValue<T, P> {
         return this.rootInput.get(mergePaths(this.path, path) as Paths<ROOT>) as PathValue<T, P>;
     }
     /** @inheritDoc */
-    public set = <const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void => {
+    public set<const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void {
         return this.rootInput.set(mergePaths(this.path, path) as Paths<ROOT>, value as PathValue<ROOT, Paths<ROOT>>);
     }
     /** @inheritDoc */
-    public reset = <const P extends Paths<T>>(path?: P): void => {
+    public reset<const P extends Paths<T>>(path?: P): void {
         return this.rootInput.reset(mergePaths(this.path, path) as Paths<ROOT>);
     }
     /** @inheritDoc */
-    public getDefault = <const P extends Paths<T>>(path?: P): PathValue<T, P> => {
+    public getDefault<const P extends Paths<T>>(path?: P): PathValue<T, P> {
         return this.rootInput.getDefault(mergePaths(this.path, path) as Paths<ROOT>) as PathValue<T, P>;
     }
     /** @inheritDoc */
-    public setDefault = <const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void => {
+    public setDefault<const P extends Paths<T>>(value: PathValue<T, P>, path?: P): void {
         return this.rootInput.setDefault(mergePaths(this.path, path) as Paths<ROOT>, value as PathValue<ROOT, Paths<ROOT>>);
     }
 }
@@ -218,7 +228,7 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
 
     private createItem(
         value: ArrayItemValue<T>,
-        index = this.order.length,
+        index?: number,
     ): { item: ArrayDataItem<ArrayItemValue<T>>; value: ArrayItemValue<T> } {
         const key = String(this.nextKey++);
         let root: RootData<ArrayItemValue<T>>;
@@ -228,7 +238,11 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
             index: () => this.order.indexOf(key),
             data: root.getData("") as DataNode<ArrayItemValue<T>>,
         };
-        this.order.splice(index, 0, key);
+        if (index) {
+            this.order.splice(index, 0, key);
+        } else {
+            this.order.push(key);
+        }
         this.items.set(key, item);
         return { item, value: root.get("") as ArrayItemValue<T> };
     }
@@ -240,6 +254,20 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
                 (this.get() as unknown[])[index] = value;
             }
         }
+    }
+
+    private getKey(keyOrIndex: string | number): string {
+        if (typeof keyOrIndex === "number") {
+            const key = this.order[keyOrIndex];
+            if (!key) {
+                throw new RangeError(`No array item exists at index ${keyOrIndex}.`);
+            }
+            return key;
+        }
+        if (!this.items.has(keyOrIndex)) {
+            throw new RangeError(`No array item exists with key ${keyOrIndex}.`);
+        }
+        return keyOrIndex;
     }
 
     public onArrayReplaced(): void {
@@ -255,26 +283,27 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
         this.use();
         return this.getItems();
     }
+
     public getItems(): ArrayDataItem<ArrayItemValue<T>>[] {
         this.ensureItems();
         return this.order.map((key) => this.items.get(key)!);
     }
+
     public useItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
         this.use();
         return this.getItem(keyOrIndex);
     }
+
     public getItem<const K extends string | number>(keyOrIndex: K): ArrayDataItem<ArrayItemValueAt<T, K>> {
         this.ensureItems();
-        const index = typeof keyOrIndex === "number"
-            ? keyOrIndex
-            : this.order.indexOf(keyOrIndex);
-        const key = this.order[index];
-        const item = key === undefined ? undefined : this.items.get(key);
-        if (!item) {
-            throw new RangeError(`No array item exists at ${String(keyOrIndex)}.`);
-        }
-        return item as ArrayDataItem<ArrayItemValueAt<T, K>>;
+        const key = this.getKey(keyOrIndex);
+        return this.items.get(key) as ArrayDataItem<ArrayItemValueAt<T, K>>;
     }
+
+    public setItem<const K extends string | number>(keyOrIndex: K, value: ArrayItemValueAt<T, K>): void {
+        this.getItem(keyOrIndex).data.set(value);
+    }
+
     public move(key: string, index: number): void {
         const data = this.ensureItems();
         const currentIndex = this.order.indexOf(key);
@@ -294,18 +323,24 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
         data.splice(index, 0, movedValue!);
         this.rerender();
     }
-    public add(item: ArrayItemValue<T>): void {
-        this.insert(item, this.ensureItems().length);
+
+    public add(...items: ArrayItemValue<T>[]): void {
+        const data = this.ensureItems();
+        const newItems = items.map((item) => this.createItem(item).value);
+        data.push(...newItems);
+        this.rerender();
     }
-    public insert(item: ArrayItemValue<T>, index: number): void {
+
+    public insert(index: number, ...items: ArrayItemValue<T>[]): void {
         const data = this.ensureItems();
         if (!Number.isInteger(index) || index < 0 || index > data.length) {
             throw new RangeError(`Array index ${index} is out of range.`);
         }
-        const arrayItem = this.createItem(item, index);
-        data.splice(index, 0, arrayItem.value);
+        const newItems = items.map((item, offset) => this.createItem(item, index + offset).value);
+        data.splice(index, 0, ...newItems);
         this.rerender();
     }
+
     public remove(key: string): void {
         const data = this.ensureItems();
         const index = this.order.indexOf(key);
@@ -325,6 +360,7 @@ type InternalData = {
 }
 
 class RootData<T> {
+    private static NON_OBJECTS = [Date, URL, Uint8Array, File];
     private inputs: Record<string, InternalData> = {};
 
     public constructor(
@@ -336,7 +372,7 @@ class RootData<T> {
 
     private processValue(path: string, value: unknown): unknown {
         const type = typeof value;
-        if (type !== "object" || [Date, URL, Uint8Array, File].some((t) => value instanceof t)) {
+        if (type !== "object" || RootData.NON_OBJECTS.some((t) => value instanceof t)) {
             this.inputs[path] ??= { current: value };
             this.inputs[path].current = value;
             return value;
@@ -367,6 +403,9 @@ class RootData<T> {
     private deepClear(path: string) {
         for (const [,data] of this.getPathsOf(path)) {
             data.current = undefined;
+            if (data.data instanceof ArrayDataClass) {
+                data.data.onArrayReplaced();
+            }
         }
     }
 
@@ -399,7 +438,7 @@ class RootData<T> {
             if (
                 typeof data.current !== "object" ||
                 Array.isArray(data.current) ||
-                [Date, URL, Buffer, Uint8Array].some((t) => data.current instanceof t)
+                RootData.NON_OBJECTS.some((t) => data.current instanceof t)
             ) {
                 throw new Error(`Expected a record type at ${subPath}`);
             }
@@ -414,14 +453,14 @@ class RootData<T> {
         return this.inputs[path];
     }
 
-    private triggerRerender(path: string, excludedData?: DataNode<unknown>): void {
+    public triggerRerender(path: string): void {
         const keys = Object.keys(this.inputs)
             .filter((k) => path === "" || k === "" || (k.startsWith(path) && (k.length === path.length || k[path.length] === ".")) || path.startsWith(`${k}.`))
             .sort((k1, k2) => k1.length - k2.length);
         for (const key of keys){
             const data = this.getDataInternal(key)?.data;
-            if (data && data !== excludedData) {
-                data.rerender();
+            if (data) {
+                data.localRerender();
             }
         }
         if (path === "") {
@@ -448,13 +487,6 @@ class RootData<T> {
         // Will process Value and update parent object. (We always want to do this on set.)
         this.deepClear(path);
         this.insertValue(path, value);
-
-        for (const [inputPath, input] of Object.entries(this.inputs)) {
-            const isWithinChangedPath = path === "" || inputPath === path || inputPath.startsWith(`${path}.`);
-            if (isWithinChangedPath && input.data instanceof ArrayDataClass && Array.isArray(input.current)) {
-                input.data.onArrayReplaced();
-            }
-        }
 
         this.triggerRerender(path);
     }
