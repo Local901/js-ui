@@ -229,7 +229,7 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
     private createItem(
         value: ArrayItemValue<T>,
         index?: number,
-    ): { item: ArrayDataItem<ArrayItemValue<T>>; value: ArrayItemValue<T> } {
+    ): { value: ArrayItemValue<T> } {
         const key = String(this.nextKey++);
         let root: RootData<ArrayItemValue<T>>;
         root = new RootData(value, (updatedValue) => this.updateItemValue(key, updatedValue));
@@ -244,7 +244,7 @@ class ArrayDataClass<ROOT, T> extends DataClass<ROOT, T> implements ArrayData<T>
             this.order.push(key);
         }
         this.items.set(key, item);
-        return { item, value: root.get("") as ArrayItemValue<T> };
+        return { value: root.get("") as ArrayItemValue<T> };
     }
 
     private updateItemValue(key: string, value: ArrayItemValue<T>): void {
@@ -442,7 +442,7 @@ class RootData<T> {
             ) {
                 throw new Error(`Expected a record type at ${subPath}`);
             }
-            (data.current as Record<string, unknown>)[parts[end - 1] as string] = currentValue;
+            (data.current as Record<string, unknown>)[parts[end] as string] = currentValue;
 
             // No need to go deeper.
             break;

@@ -12,19 +12,7 @@ export type CellControls = {
     move(index: number): void;
 }
 
-export interface ColumnDefinition<T> {
-    key: string;
-    header: string | (() => ChildType);
-    cell: (data: DataNode<T>, controls: CellControls) => ChildType;
-}
-
-export interface TableProperties<T> extends DefaultProperties {
-    select: ColumnDefinition<T>[];
-    from: ArrayData<T>;
-    onClick?: (row: ArrayDataItem<T>) => void;
-}
-
-export function Table<T>(props: TableProperties<T>): ChildType {
+export function Table<T>(props: Table.Properties<T>): ChildType {
     const array = props.from.useItems();
 
     return <table
@@ -59,4 +47,18 @@ export function Table<T>(props: TableProperties<T>): ChildType {
             </For>
         </tbody>
     </table>
+}
+
+export namespace Table {
+    export interface Column<T> {
+        key: string;
+        header: string | (() => ChildType);
+        cell: (data: DataNode<T>, controls: CellControls) => ChildType;
+    }
+
+    export interface Properties<T> extends DefaultProperties {
+        select: Column<T>[];
+        from: ArrayData<T[]>;
+        onClick?: (row: ArrayDataItem<T>) => void;
+    }
 }

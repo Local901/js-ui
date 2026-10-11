@@ -16,6 +16,29 @@ afterEach(() => {
 });
 
 describe("ArrayData", () => {
+    it("Data integrity should be maintained", () => {
+        Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+        const container = document.createElement("div");
+        const root = createRoot(container);
+        activeRoots.push(root);
+
+        let rootData: Data<{ data: Item }> | undefined;
+        let data: Data<Item> | undefined;
+        function App() {
+            rootData = useData({ data: { name: "first" } });
+            data = rootData.getData("data");
+            return <span>{data.getData("name").use()}</span>;
+        }
+
+        act(() => root.render(<App />));
+
+        act(() => data?.set("updated", "name"));
+
+        expect(container.textContent).toBe("updated");
+        expect(data!.get()).toEqual({ name: "updated" });
+        expect(rootData!.get()).toEqual({ data: { name: "updated" } });
+    });
+
     it("notifies only the changed item for item-value updates", () => {
         Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
         const container = document.createElement("div");
