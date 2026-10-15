@@ -92,11 +92,11 @@ export interface Data<T> {
     localRerender(): void;
 }
 
-export interface ArrayDataItem<T> {
+export type ArrayDataItem<T> = Readonly<{
     index(): number;
     key: string;
     data: DataNode<T>;
-};
+}>;
 
 type ArrayItemValue<T> = T extends readonly (infer I)[] ? I : never;
 type ArrayItemValueAt<T, K extends string | number> = K extends number
@@ -145,10 +145,14 @@ class DataClass<ROOT, T> implements Data<T> {
         const [_value, reducer] = useReducer((prev) => ++prev, 0);
 
         const result = this.get("") as T;
+        const previousValue = useRef(result);
         useEffect(() => {
             const rerender = rerenderFilter
                 ? () => {
-                    if (rerenderFilter(result, this.get("") as T)) {
+                    const newValue = this.get("") as T;
+                    const oldValue = previousValue.current;
+                    previousValue.current = newValue;
+                    if (rerenderFilter(newValue, oldValue)) {
                         reducer();
                     }
                 }
@@ -156,7 +160,7 @@ class DataClass<ROOT, T> implements Data<T> {
             this.reducers.push(rerender);
 
             return () => this.reducers.splice(this.reducers.indexOf(rerender), 1);
-        }, [reducer])
+        }, [reducer, rerenderFilter])
 
         return result;
     }
@@ -372,7 +376,7 @@ class RootData<T> {
 
     private processValue(path: string, value: unknown): unknown {
         const type = typeof value;
-        if (type !== "object" || RootData.NON_OBJECTS.some((t) => value instanceof t)) {
+        if (value === null || type !== "object" || RootData.NON_OBJECTS.some((t) => value instanceof t)) {
             this.inputs[path] ??= { current: value };
             this.inputs[path].current = value;
             return value;
