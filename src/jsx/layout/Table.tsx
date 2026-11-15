@@ -17,7 +17,8 @@ export function Table<T>(props: Table.Properties<T>): ChildType {
         getControls={(_item, index) => ({
             index: () => index,
         })}
-    />
+        onClick={props.onClick}
+    />;
 }
 
 export namespace Table {

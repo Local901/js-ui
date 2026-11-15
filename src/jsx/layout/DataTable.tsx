@@ -24,40 +24,8 @@ export function DataTable<T>(props: DataTable.Properties<T>): ChildType {
             remove: () => props.from.remove(item.key),
             move: (index) => props.from.move(item.key, index),
         })}
-    />
-
-    // return <table
-    //     {...getDefaultProperties(props, "ui-table")}
-    // >
-    //     <thead>
-    //         <tr>
-    //             <For each={props.select}>
-    //                 {(column) => <th key={column.key}>
-    //                     {typeof column.header === "function" ? column.header() : column.header}
-    //                 </th>}
-    //             </For>
-    //         </tr>
-    //     </thead>
-    //     <tbody>
-    //         <For each={array}>
-    //             {(row) => <tr
-    //                 key={row.key}
-    //                 className={props.onClick ? "clickable" : undefined}
-    //                 onClick={() => props.onClick?.(row as ArrayDataItem<T>)}
-    //             >
-    //                 <For each={props.select}>
-    //                     {(column) => <td key={column.key}>
-    //                         {column.cell(row.data as DataNode<T>, {
-    //                             index: row.index,
-    //                             remove: () => props.from.remove(row.key),
-    //                             move: (index) => props.from.move(row.key, index),
-    //                         })}
-    //                     </td>}
-    //                 </For>
-    //             </tr>}
-    //         </For>
-    //     </tbody>
-    // </table>
+        onClick={props.onClick}
+    />;
 }
 
 export namespace DataTable {

@@ -1,5 +1,6 @@
-import { useReducer, useRef, type ActionDispatch } from "react";
-import { useEffect } from "./Effect.js";
+import { useReducer, useRef } from "react";
+import { EventController, Publisher } from "./Event.js";
+import { useCallback } from "./Callback.js";
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined | Date | URL | Uint8Array | File;
 
@@ -44,6 +45,12 @@ export type DataNode<T> = Extract<T, readonly unknown[]> extends never ? Data<T>
 
 export interface Data<T> {
     use(rerenderFilter?: (newValue: T, oldValue: T) => boolean): T;
+    /**
+     * Fire an event containing the new and old values when the data changes.
+     *
+     * @param publisher Publish new and old value on change.
+     */
+    onChange(publisher: Publisher<[T, T]>): void;
     getData<const P extends Paths<T>>(path: P): DataNode<PathValue<T, P>>;
     /**
      * Get the value of the input or a sub-value.
@@ -133,7 +140,7 @@ function mergePaths(root: string, subPath: string = ""): string {
 }
 
 class DataClass<ROOT, T> implements Data<T> {
-    private reducers: ActionDispatch<[]>[] = [];
+    private readonly reducers: EventController<[]> = new EventController();
 
     public constructor(
         protected rootInput: RootData<ROOT>,
@@ -146,31 +153,37 @@ class DataClass<ROOT, T> implements Data<T> {
 
         const result = this.get("") as T;
         const previousValue = useRef(result);
-        useEffect(() => {
-            const rerender = rerenderFilter
-                ? () => {
-                    const newValue = this.get("") as T;
-                    const oldValue = previousValue.current;
-                    previousValue.current = newValue;
-                    if (rerenderFilter(newValue, oldValue)) {
-                        reducer();
-                    }
-                }
-                : reducer;
-            this.reducers.push(rerender);
-
-            return () => this.reducers.splice(this.reducers.indexOf(rerender), 1);
-        }, [reducer, rerenderFilter])
+        const handler = useCallback(() => {
+            if (!rerenderFilter) {
+                reducer();
+                return;
+            }
+            const newValue = this.get("") as T;
+            const oldValue = previousValue.current;
+            previousValue.current = newValue;
+            if (rerenderFilter(newValue, oldValue)) {
+                reducer();
+            }
+        }, [reducer, rerenderFilter]);
+        this.reducers.subscribe(handler);
 
         return result;
     }
+
+    /** @inheritdoc */
+    public onChange(publisher: Publisher<[T, T]>): void {
+        const previousValue = useRef<T>(undefined);
+        const handler = useCallback(() => {
+            const newValue = this.get("") as T;
+            const oldValue = previousValue.current;
+            previousValue.current = newValue;
+            publisher.publish(newValue, oldValue!);
+        });
+        this.reducers.subscribe(handler);
+    }
     /** @inheritDoc */
     public localRerender(): void {
-        for(const reducer of this.reducers) {
-            try {
-                reducer();
-            } catch (e) {}
-        }
+        this.reducers.publish();
     }
     public rerender(): void {
         this.rootInput.triggerRerender(this.path);
@@ -544,6 +557,12 @@ class RootData<T> {
     }
 }
 
+/**
+ * Use data for distributed state listening.
+ *
+ * @param init Initial value.
+ * @returns Data
+ */
 export function useData<T>(init: T): DataNode<T> {
     const controller = useRef<RootData<T>>(null);
     if (!controller.current) {
